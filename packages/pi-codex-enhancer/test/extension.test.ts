@@ -98,6 +98,52 @@ async function start(fixture: Setup): Promise<void> {
 }
 
 describe('createEnhancerExtension', () => {
+  it('marks itself loaded before any request, without opening a widget row', async () => {
+    const fixture = setup()
+    await start(fixture)
+    expect(fixture.harness.ui.statuses).toEqual(['? codex+'])
+    expect(fixture.harness.ui.widgets).toEqual([undefined])
+  })
+
+  it('stays out of the footer entirely when it is disabled', async () => {
+    const fixture = setup({ config: { enabled: false } })
+    await start(fixture)
+    expect(fixture.harness.ui.statuses).toEqual([undefined])
+  })
+
+  it('opens a widget row naming why nothing could be minted', async () => {
+    const fixture = setup({ outcomes: [{ ok: false, reason: 'network', message: 'socket hang up' }] })
+    await start(fixture)
+    await fixture.send()
+    expect(fixture.harness.ui.widgets.at(-1)).toEqual(['? codex+ no state · socket hang up'])
+  })
+
+  it('opens a widget row naming what the degraded response carried', async () => {
+    const fixture = setup()
+    await start(fixture)
+    await fixture.send()
+    await fixture.respond(degradedState())
+    expect(fixture.harness.ui.widgets.at(-1)?.[0]).toContain('degraded · response carried 312 chars')
+  })
+
+  it('takes the widget row back down once a state is held again', async () => {
+    const fixture = setup({ outcomes: [{ ok: false, reason: 'network', message: 'socket hang up' }] })
+    await start(fixture)
+    await fixture.send()
+    await fixture.respond(goodState())
+    expect(fixture.harness.ui.statuses.at(-1)).toBe('✓ codex+')
+    expect(fixture.harness.ui.widgets.at(-1)).toBeUndefined()
+  })
+
+  it('drops the previous outcome when the user switches model', async () => {
+    const fixture = setup({ outcomes: [{ ok: false, reason: 'network', message: 'socket hang up' }] })
+    await start(fixture)
+    await fixture.send()
+    await fixture.harness.emit('model_select', { type: 'model_select' })
+    expect(fixture.harness.ui.statuses.at(-1)).toBe('? codex+')
+    expect(fixture.harness.ui.widgets.at(-1)).toBeUndefined()
+  })
+
   it('mints and injects the state on the first request of a session', async () => {
     const fixture = setup()
     await start(fixture)
@@ -153,7 +199,7 @@ describe('createEnhancerExtension', () => {
     await start(fixture)
     await fixture.send()
     expect(fixture.headers[TURN_STATE_HEADER]).toBeUndefined()
-    expect(fixture.harness.ui.statuses.at(-1)).toBe('? codex+ no state')
+    expect(fixture.harness.ui.statuses.at(-1)).toBe('? codex+')
   })
 
   it('captures a good state from a real response without spending a probe', async () => {
@@ -162,7 +208,7 @@ describe('createEnhancerExtension', () => {
     await fixture.send()
     await fixture.respond(goodState())
     expect(fixture.store.read('acct-1', 'gpt-6-astra', 0)?.source).toBe('response')
-    expect(fixture.harness.ui.statuses.at(-1)).toBe('✓ codex+ 292 · 60m left')
+    expect(fixture.harness.ui.statuses.at(-1)).toBe('✓ codex+')
   })
 
   it('drops the state and warns when a response carries a degraded one', async () => {
@@ -170,7 +216,7 @@ describe('createEnhancerExtension', () => {
     await start(fixture)
     await fixture.send()
     await fixture.respond(degradedState())
-    expect(fixture.harness.ui.statuses.at(-1)).toBe('⚠ codex+ degraded')
+    expect(fixture.harness.ui.statuses.at(-1)).toBe('⚠ codex+')
     expect(fixture.harness.ui.notifications.at(-1)?.message).toContain('312')
   })
 
@@ -230,7 +276,7 @@ describe('createEnhancerExtension', () => {
     await fixture.send()
     await fixture.send()
     expect(fixture.probes).toHaveLength(1)
-    expect(fixture.harness.ui.statuses.at(-1)).toBe('· codex+ not gated')
+    expect(fixture.harness.ui.statuses.at(-1)).toBe('· codex+')
   })
 
   it('tells the user once that the websocket transport cannot carry the header', async () => {
@@ -273,21 +319,23 @@ describe('createEnhancerExtension', () => {
     expect(fixture.probes).toHaveLength(0)
   })
 
-  it('clears the footer on shutdown', async () => {
+  it('clears both surfaces on shutdown', async () => {
     const fixture = setup()
     await start(fixture)
     await fixture.send()
     await fixture.harness.emit('session_shutdown', { type: 'session_shutdown' })
     expect(fixture.harness.ui.statuses.at(-1)).toBeUndefined()
+    expect(fixture.harness.ui.widgets.at(-1)).toBeUndefined()
   })
 
-  it('clears the footer when the user selects a model it does not watch', async () => {
+  it('clears both surfaces when the user selects a model it does not watch', async () => {
     const fixture = setup()
     await start(fixture)
     await fixture.send()
     fixture.harness.context.model = codexModel({ api: 'openai-responses' })
     await fixture.harness.emit('model_select', { type: 'model_select' })
     expect(fixture.harness.ui.statuses.at(-1)).toBeUndefined()
+    expect(fixture.harness.ui.widgets.at(-1)).toBeUndefined()
   })
 
   it('registers its command', async () => {

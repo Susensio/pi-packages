@@ -17,7 +17,6 @@ export interface HeaderObservation {
   status: number | undefined
   servedModel: string | undefined
   fasterFallbackModel: string | undefined
-  bufferingEnabled: string | undefined
   sawRoutingHeaders: boolean
 }
 
@@ -32,7 +31,6 @@ export interface TurnObservation extends AssistantObservation {
   servedModel: string | undefined
   servedModelSource: 'header' | 'responseModel' | undefined
   fasterFallbackModel: string | undefined
-  bufferingEnabled: string | undefined
   sawRoutingHeaders: boolean
   backendFamily: BackendFamily
   status: number | undefined
@@ -72,7 +70,6 @@ export function observeResponseHeaders(status: number, headers: Record<string, s
     status,
     servedModel: SERVED_MODEL_HEADERS.map(name => readString(normalized, name)).find(value => value !== undefined),
     fasterFallbackModel: readString(normalized, FASTER_MODEL_HEADER),
-    bufferingEnabled: readString(normalized, BUFFERING_ENABLED_HEADER),
     sawRoutingHeaders: ROUTING_HEADERS.some(name => normalized[name] !== undefined),
   }
 }
@@ -146,7 +143,6 @@ export function buildTurnObservation(options: BuildTurnOptions): TurnObservation
     servedModel,
     servedModelSource: servedModel === undefined ? undefined : fromHeader !== undefined ? 'header' : 'responseModel',
     fasterFallbackModel: headers?.fasterFallbackModel,
-    bufferingEnabled: headers?.bufferingEnabled,
     sawRoutingHeaders: headers?.sawRoutingHeaders ?? false,
     backendFamily: backendFamily(assistant.responseId),
     status: headers?.status,

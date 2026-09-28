@@ -17,17 +17,8 @@ import {
 } from './config.js'
 import { createHarvester, extractAccountId } from './harvest.js'
 import { createProbeTransport } from './probe.js'
-import { renderAlert, renderStatus } from './render.js'
-import {
-  classifyTurnState,
-  isUsable,
-  mintTicket,
-  needsRefresh,
-  newerTicket,
-  TICKET_TTL_MS,
-  ticketAgeMs,
-  TURN_STATE_HEADER,
-} from './state.js'
+import { renderAlert, renderDetail, renderStatus } from './render.js'
+import { classifyTurnState, isUsable, mintTicket, needsRefresh, newerTicket, TURN_STATE_HEADER } from './state.js'
 import { TicketStore as DefaultTicketStore } from './store.js'
 
 /** Pi refreshes the token itself, so re-reading the credential every request buys nothing. */
@@ -129,11 +120,14 @@ export function createEnhancerExtension(pi: ExtensionAPI, dependencies: Enhancer
   }
 
   function paint(context: ExtensionContext): void {
-    const remaining = ticket === undefined ? undefined : TICKET_TTL_MS - ticketAgeMs(ticket, now())
-    context.ui.setStatus(
-      EXTENSION_ID,
-      renderStatus(kind === 'good' ? { kind, remainingMs: remaining } : { kind }, context.ui.theme),
-    )
+    const view = { kind, detail: lastOutcome }
+    context.ui.setStatus(EXTENSION_ID, renderStatus(view, context.ui.theme))
+    context.ui.setWidget(EXTENSION_ID, renderDetail(view, context.ui.theme))
+  }
+
+  function clear(context: ExtensionContext): void {
+    context.ui.setStatus(EXTENSION_ID, undefined)
+    context.ui.setWidget(EXTENSION_ID, undefined)
   }
 
   async function resolveIdentity(context: ExtensionContext, model: Model<Api>): Promise<ProbeIdentity | undefined> {
@@ -228,7 +222,13 @@ export function createEnhancerExtension(pi: ExtensionAPI, dependencies: Enhancer
     transport = readTransport(context.cwd, agentDir)
     store = createStore(agentDir)
     harvester = createHarvesterFor(config)
-    context.ui.setStatus(EXTENSION_ID, undefined)
+    // Painting here rather than clearing is what makes "loaded, nothing minted yet" look different
+    // from "not installed" — `model_select` does not reliably fire on a fresh session.
+    if (config.enabled && watches(context.model)) {
+      paint(context)
+    } else {
+      clear(context)
+    }
 
     if (config.enabled && transport !== 'sse') {
       announce(context, 'transport', renderAlert('transport', transport))
@@ -316,16 +316,17 @@ export function createEnhancerExtension(pi: ExtensionAPI, dependencies: Enhancer
 
   pi.on('model_select', (_event, context) => {
     if (!config.enabled || !watches(context.model)) {
-      context.ui.setStatus(EXTENSION_ID, undefined)
+      clear(context)
 
       return
     }
     kind = 'missing'
+    lastOutcome = undefined
     paint(context)
   })
 
   pi.on('session_shutdown', (_event, context) => {
-    context.ui.setStatus(EXTENSION_ID, undefined)
+    clear(context)
     reset()
   })
 

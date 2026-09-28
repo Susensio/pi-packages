@@ -11,12 +11,14 @@ interface CommandRegistration {
 
 interface UiRecorder {
   statuses: (string | undefined)[]
+  widgets: (string[] | undefined)[]
   notifications: { message: string; type: string | undefined }[]
 }
 
 interface HarnessContext {
   ui: {
     setStatus: (key: string, text: string | undefined) => void
+    setWidget: (key: string, content: string[] | undefined) => void
     notify: (message: string, type?: string) => void
     theme: StatusTheme
   }
@@ -50,11 +52,12 @@ export function createRegistry(models: RegistryModel[] = []): ModelRegistry {
 export function createHarness(registry: ModelRegistry = createRegistry()): Harness {
   const handlers = new Map<string, ((event: unknown, context: unknown) => void)[]>()
   const commands = new Map<string, CommandRegistration>()
-  const ui: UiRecorder = { statuses: [], notifications: [] }
+  const ui: UiRecorder = { statuses: [], widgets: [], notifications: [] }
 
   const context: HarnessContext = {
     ui: {
       setStatus: (_key, text) => ui.statuses.push(text),
+      setWidget: (_key, content) => ui.widgets.push(content),
       notify: (message, type) => ui.notifications.push({ message, type }),
       theme: PLAIN_THEME,
     },

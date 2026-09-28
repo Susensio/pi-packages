@@ -12,12 +12,24 @@ header, so every turn starts from nothing. This mints one, holds it for its hour
 Codex request, and drops it the moment the server hands back a degraded one:
 
 ```
-✓ codex+ 292 · 47m left   a valid state is going out on every request
-… codex+ minting          a state is being minted right now
-⚠ codex+ degraded         the server sent a short state; it was dropped and will be re-minted
-? codex+ no state         nothing could be minted, and the request went out bare
-· codex+ not gated        this model does not use a turn state
+✓ codex+   a valid state is going out on every request
+… codex+   a state is being minted right now
+⚠ codex+   the server sent a short state; it was dropped and will be re-minted
+? codex+   no state is held, and the request went out bare
+· codex+   this model does not use a turn state
 ```
+
+Every extension shares that one footer line and it is truncated to the terminal width, so the
+detail only appears when something has actually gone wrong — one row above the editor, which comes
+back down as soon as a state is held again:
+
+```
+? codex+ no state · socket hang up
+⚠ codex+ degraded · response carried 312 chars, not 292
+```
+
+A session that simply has not minted yet is not a fault, so it stays at the footer glyph. How long
+the held state has left is in `/codex-enhancer`.
 
 Requests are never blocked: no state just means no header.
 

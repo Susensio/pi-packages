@@ -14,7 +14,8 @@ export type AlertKind = 'degraded' | 'transport' | 'unreachable'
 
 export interface StatusView {
   kind: StatusKind
-  remainingMs?: number | undefined
+  /** What the last probe or response made of it, for the widget row. */
+  detail?: string | undefined
 }
 
 export interface ReportView {
@@ -50,25 +51,32 @@ function formatDuration(ms: number): string {
   return minutes < 1 ? '<1m' : `${minutes}m`
 }
 
-function kindText(view: StatusView): string {
-  if (view.kind === 'good') {
-    return view.remainingMs === undefined ? '292' : `292 · ${formatDuration(view.remainingMs)} left`
-  }
-  if (view.kind === 'minting') {
-    return 'minting'
-  }
-  if (view.kind === 'degraded') {
-    return 'degraded'
-  }
-
-  return view.kind === 'missing' ? 'no state' : 'not gated'
+/**
+ * The footer token. Always present, so "no state" is stated rather than implied to be fine, but
+ * every extension's status shares one hard-truncated line — so it stays a glyph wide.
+ */
+export function renderStatus(view: StatusView, theme: StatusTheme): string {
+  return `${theme.fg(KIND_COLORS[view.kind], KIND_GLYPHS[view.kind])} ${theme.fg('dim', LABEL)}`
 }
 
-/** The footer line. Always present, so "no state" is stated rather than implied to be fine. */
-export function renderStatus(view: StatusView, theme: StatusTheme): string {
+/**
+ * The widget row, opened only once something has actually gone wrong. A session that has simply
+ * not minted yet is not a fault, so it stays at the footer glyph and costs no rows.
+ */
+export function renderDetail(view: StatusView, theme: StatusTheme): string[] | undefined {
+  if (view.detail === undefined || (view.kind !== 'degraded' && view.kind !== 'missing')) {
+    return undefined
+  }
   const color = KIND_COLORS[view.kind]
 
-  return `${theme.fg(color, KIND_GLYPHS[view.kind])} ${theme.fg('dim', LABEL)} ${theme.fg(color, kindText(view))}`
+  return [
+    [
+      theme.fg(color, KIND_GLYPHS[view.kind]),
+      theme.fg('dim', LABEL),
+      theme.fg(color, view.kind === 'degraded' ? 'degraded' : 'no state'),
+      theme.fg('dim', `· ${view.detail}`),
+    ].join(' '),
+  ]
 }
 
 export function renderAlert(kind: AlertKind, detail: string): string {

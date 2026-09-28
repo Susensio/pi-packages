@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { compareVersions, createIdentityResolver, describeIdentity, parseSlug } from '../src/identity.js'
+import { compareVersions, createIdentityResolver, parseSlug } from '../src/identity.js'
 
 describe('parseSlug', () => {
   it('splits a versioned OpenAI slug into family, version and variant', () => {
@@ -42,13 +42,13 @@ describe('createIdentityResolver', () => {
   it('ranks a slug from the built-in table', () => {
     const identity = createIdentityResolver().identify('gpt-6-astra')
 
-    expect(identity).toMatchObject({ known: true, source: 'builtin', tier: 100, tierSource: 'builtin' })
+    expect(identity).toMatchObject({ known: true, source: 'builtin', tier: 100 })
   })
 
   it('lets configured tiers outrank the built-in table', () => {
     const identity = createIdentityResolver({ tiers: { 'gpt-6-astra': 1 } }).identify('gpt-6-astra')
 
-    expect(identity).toMatchObject({ tier: 1, tierSource: 'config', source: 'config' })
+    expect(identity).toMatchObject({ tier: 1, source: 'config' })
   })
 
   it('resolves a server-side suffix to its longest recorded base', () => {
@@ -67,7 +67,6 @@ describe('createIdentityResolver', () => {
     const identity = createIdentityResolver().identify('gpt-5.9-quasar')
 
     expect(identity).toMatchObject({ known: false, source: 'inferred', version: [5, 9] })
-    expect(describeIdentity(identity!)).toContain('unrecorded, inferred from the slug')
   })
 
   it('leaves a bare slug with no version and no variant to the ladder to reject', () => {

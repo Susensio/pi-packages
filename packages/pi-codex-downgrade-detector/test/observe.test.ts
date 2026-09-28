@@ -20,7 +20,6 @@ describe('observeResponseHeaders', () => {
       status: 200,
       servedModel: 'gpt-5.6-luna',
       fasterFallbackModel: 'gpt-5.6-luna',
-      bufferingEnabled: 'false',
       sawRoutingHeaders: true,
     })
   })

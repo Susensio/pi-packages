@@ -79,7 +79,6 @@ export interface ModelIdentity extends SlugShape {
   /** Server-side suffix beyond that base. */
   suffix: string | undefined
   tier: number | undefined
-  tierSource: 'config' | 'builtin' | undefined
 }
 
 export interface IdentityResolver {
@@ -167,25 +166,6 @@ export function compareVersions(left: number[], right: number[]): number {
   return 0
 }
 
-/** Short provenance string, quoted inside finding messages. */
-export function describeIdentity(identity: ModelIdentity): string {
-  if (identity.tier !== undefined) {
-    return `ranked ${identity.tier} in the ${identity.tierSource === 'config' ? 'configured' : 'built-in'} tier table`
-  }
-  if (identity.source === 'registry') {
-    return 'offered by this provider but ranked nowhere'
-  }
-  const bits = identity.vendor === 'openai' ? [] : ['not an OpenAI slug']
-  if (identity.version.length > 0) {
-    bits.push(`v${identity.version.join('.')}`)
-  }
-  if (identity.sizeMarker !== undefined) {
-    bits.push(`'${identity.sizeMarker}' size marker`)
-  }
-
-  return `unrecorded, inferred from the slug (${bits.length > 0 ? bits.join(', ') : 'shape only'})`
-}
-
 /**
  * Resolves 'what is this slug?' from the configured ranks, the built-in table, then the slugs
  * Pi's registry says the provider offers, then structural inference — so an unrecorded model is
@@ -219,19 +199,15 @@ export function createIdentityResolver(options: IdentityResolverOptions = {}): I
     return recorded.find(base => key.startsWith(base) && key.length > base.length && '-_'.includes(key[base.length]!))
   }
 
-  function lookupTier(key: string, base: string | undefined): Pick<ModelIdentity, 'tier' | 'tierSource'> {
+  function lookupTier(key: string, base: string | undefined): number | undefined {
     for (const candidate of base === undefined || base === key ? [key] : [key, base]) {
-      const configured = configTiers[candidate]
-      if (configured !== undefined) {
-        return { tier: configured, tierSource: 'config' }
-      }
-      const builtin = MODEL_TIERS[candidate]
-      if (builtin !== undefined) {
-        return { tier: builtin, tierSource: 'builtin' }
+      const tier = configTiers[candidate] ?? MODEL_TIERS[candidate]
+      if (tier !== undefined) {
+        return tier
       }
     }
 
-    return { tier: undefined, tierSource: undefined }
+    return undefined
   }
 
   function identify(slug: string | undefined): ModelIdentity | undefined {
@@ -248,7 +224,7 @@ export function createIdentityResolver(options: IdentityResolverOptions = {}): I
     const shape = parseSlug(base ?? key)
     const identity: ModelIdentity = {
       ...shape,
-      ...lookupTier(key, base),
+      tier: lookupTier(key, base),
       slug: slug.trim(),
       normalized: key,
       known: base !== undefined,

@@ -18,7 +18,7 @@ import {
   observeRequestPayload,
   observeResponseHeaders,
 } from './observe.js'
-import { renderAlert, renderStatus } from './render.js'
+import { renderAlert, renderDetail, renderStatus, renderWaitingStatus } from './render.js'
 import { isSubstitution, judgeTurn } from './verdict.js'
 
 /** How many judged turns `/codex-downgrade` can report on. */
@@ -113,7 +113,8 @@ export function createDetectorExtension(pi: ExtensionAPI, dependencies: Detector
       tiers: config.tiers,
       registrySlugs: registrySlugs(context.modelRegistry, config.providers),
     })
-    context.ui.setStatus(EXTENSION_ID, undefined)
+    context.ui.setStatus(EXTENSION_ID, renderWaitingStatus(context.ui.theme))
+    context.ui.setWidget(EXTENSION_ID, undefined)
   })
 
   pi.on('before_provider_request', (event, context) => {
@@ -153,6 +154,7 @@ export function createDetectorExtension(pi: ExtensionAPI, dependencies: Detector
         verdicts.shift()
       }
       context.ui.setStatus(EXTENSION_ID, renderStatus(verdict, context.ui.theme))
+      context.ui.setWidget(EXTENSION_ID, renderDetail(verdict, context.ui.theme))
 
       const pair = `${turn.requestedModel}->${turn.servedModel ?? '(none)'}`
       if (config.notify && isSubstitution(verdict) && !notified.has(pair)) {
@@ -166,6 +168,7 @@ export function createDetectorExtension(pi: ExtensionAPI, dependencies: Detector
 
   pi.on('session_shutdown', (_event, context) => {
     context.ui.setStatus(EXTENSION_ID, undefined)
+    context.ui.setWidget(EXTENSION_ID, undefined)
     reset()
   })
 

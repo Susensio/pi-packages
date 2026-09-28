@@ -34,12 +34,36 @@ function respond(harness: Harness, headers: Record<string, string>, message: Rec
 }
 
 describe('createDetectorExtension', () => {
-  it('shows the served model in the footer on a clean turn', () => {
+  it('marks itself loaded before any turn has finished', () => {
+    const harness = start()
+
+    expect(harness.ui.statuses).toEqual(['· codex'])
+    expect(harness.ui.widgets).toEqual([undefined])
+  })
+
+  it('passes a clean turn with a footer glyph and no widget row', () => {
     const harness = start()
     respond(harness, { 'openai-model': 'gpt-6-astra' }, assistantMessage())
 
-    expect(harness.ui.statuses.at(-1)).toBe('✓ codex gpt-6-astra')
+    expect(harness.ui.statuses.at(-1)).toBe('✓ codex')
+    expect(harness.ui.widgets.at(-1)).toBeUndefined()
     expect(harness.ui.notifications).toEqual([])
+  })
+
+  it('opens a widget row naming both slugs when a turn diverged', () => {
+    const harness = start()
+    respond(harness, { 'openai-model': 'gpt-5.6-luna' }, assistantMessage())
+
+    expect(harness.ui.widgets.at(-1)?.[0]).toBe('↓ codex gpt-6-astra→gpt-5.6-luna (openai-model header)')
+  })
+
+  it('takes the widget row back down once a later turn comes back clean', () => {
+    const harness = start()
+    respond(harness, { 'openai-model': 'gpt-5.6-luna' }, assistantMessage())
+    respond(harness, { 'openai-model': 'gpt-6-astra' }, assistantMessage())
+
+    expect(harness.ui.statuses.at(-1)).toBe('✓ codex')
+    expect(harness.ui.widgets.at(-1)).toBeUndefined()
   })
 
   it('notifies once per requested-to-served pair, not once per turn', () => {
@@ -47,7 +71,7 @@ describe('createDetectorExtension', () => {
     respond(harness, { 'openai-model': 'gpt-5.6-luna' }, assistantMessage())
     respond(harness, { 'openai-model': 'gpt-5.6-luna' }, assistantMessage())
 
-    expect(harness.ui.statuses.at(-1)).toBe('↓ codex gpt-6-astra→gpt-5.6-luna')
+    expect(harness.ui.statuses.at(-1)).toBe('↓ codex')
     expect(harness.ui.notifications).toHaveLength(1)
     expect(harness.ui.notifications[0]).toMatchObject({ type: 'error' })
   })
@@ -56,7 +80,7 @@ describe('createDetectorExtension', () => {
     const harness = start()
     respond(harness, { 'openai-model': 'gpt-6-astra' }, assistantMessage({ model: 'gpt-5.4' }))
 
-    expect(harness.ui.statuses.at(-1)).toBe('↑ codex gpt-5.4→gpt-6-astra')
+    expect(harness.ui.statuses.at(-1)).toBe('↑ codex')
     expect(harness.ui.notifications).toHaveLength(1)
   })
 
@@ -65,28 +89,28 @@ describe('createDetectorExtension', () => {
     respond(harness, { 'openai-model': 'gpt-5.6-luna' }, assistantMessage())
 
     expect(harness.ui.notifications).toEqual([])
-    expect(harness.ui.statuses.at(-1)).toBe('↓ codex gpt-6-astra→gpt-5.6-luna')
+    expect(harness.ui.statuses.at(-1)).toBe('↓ codex')
   })
 
   it('ignores providers it does not watch', () => {
     const harness = start()
     respond(harness, { 'openai-model': 'claude-haiku-5' }, assistantMessage({ provider: 'anthropic' }))
 
-    expect(harness.ui.statuses).toEqual([undefined])
+    expect(harness.ui.statuses).toEqual(['· codex'])
   })
 
   it('watches every provider when the list is empty', () => {
     const harness = start({ config: { providers: [] } })
     respond(harness, { 'openai-model': 'gpt-6-astra' }, assistantMessage({ provider: 'my-relay' }))
 
-    expect(harness.ui.statuses.at(-1)).toBe('✓ codex gpt-6-astra')
+    expect(harness.ui.statuses.at(-1)).toBe('✓ codex')
   })
 
   it('reports unverified when the transport exposes no routing header', () => {
     const harness = start()
     respond(harness, {}, assistantMessage())
 
-    expect(harness.ui.statuses.at(-1)).toBe('? codex gpt-6-astra unverified')
+    expect(harness.ui.statuses.at(-1)).toBe('? codex')
   })
 
   it("does not reuse one turn's headers for the next turn", () => {
@@ -94,7 +118,7 @@ describe('createDetectorExtension', () => {
     respond(harness, { 'openai-model': 'gpt-6-astra' }, assistantMessage())
     harness.emit('message_end', { message: assistantMessage() })
 
-    expect(harness.ui.statuses.at(-1)).toBe('? codex gpt-6-astra unverified')
+    expect(harness.ui.statuses.at(-1)).toBe('? codex')
   })
 
   it('compares the sent effort against what the model maps the selected level to', () => {
@@ -107,7 +131,7 @@ describe('createDetectorExtension', () => {
     harness.emit('after_provider_response', { status: 200, headers: { 'openai-model': 'gpt-6-astra' } })
     harness.emit('message_end', { message: assistantMessage() })
 
-    expect(harness.ui.statuses.at(-1)).toBe('⚠ codex gpt-6-astra · high→medium')
+    expect(harness.ui.statuses.at(-1)).toBe('⚠ codex')
   })
 
   it('accepts the effort a model declares for that level', () => {
@@ -120,7 +144,7 @@ describe('createDetectorExtension', () => {
     harness.emit('after_provider_response', { status: 200, headers: { 'openai-model': 'gpt-6-astra' } })
     harness.emit('message_end', { message: assistantMessage() })
 
-    expect(harness.ui.statuses.at(-1)).toBe('✓ codex gpt-6-astra')
+    expect(harness.ui.statuses.at(-1)).toBe('✓ codex')
   })
 
   it('skips the effort axis when checkEffort is off', () => {
@@ -131,7 +155,7 @@ describe('createDetectorExtension', () => {
     harness.emit('after_provider_response', { status: 200, headers: { 'openai-model': 'gpt-6-astra' } })
     harness.emit('message_end', { message: assistantMessage() })
 
-    expect(harness.ui.statuses.at(-1)).toBe('✓ codex gpt-6-astra')
+    expect(harness.ui.statuses.at(-1)).toBe('✓ codex')
   })
 
   it('treats a slug the registry offers as recorded', () => {
@@ -143,15 +167,17 @@ describe('createDetectorExtension', () => {
     })
     respond(harness, { 'openai-model': 'codex-auto-review' }, assistantMessage({ model: 'codex-auto-review' }))
 
-    expect(harness.ui.statuses.at(-1)).toBe('✓ codex codex-auto-review')
+    expect(harness.ui.statuses.at(-1)).toBe('✓ codex')
+    expect(harness.ui.widgets.at(-1)).toBeUndefined()
   })
 
-  it('clears the footer on shutdown', () => {
+  it('clears both surfaces on shutdown', () => {
     const harness = start()
-    respond(harness, { 'openai-model': 'gpt-6-astra' }, assistantMessage())
+    respond(harness, { 'openai-model': 'gpt-5.6-luna' }, assistantMessage())
     harness.emit('session_shutdown', {})
 
     expect(harness.ui.statuses.at(-1)).toBeUndefined()
+    expect(harness.ui.widgets.at(-1)).toBeUndefined()
   })
 
   it('registers the command and reports the session', async () => {

@@ -2,7 +2,7 @@ import type { TurnObservation } from '../src/observe.js'
 import type { Verdict } from '../src/verdict.js'
 import { describe, expect, it } from 'vitest'
 import { createIdentityResolver } from '../src/identity.js'
-import { renderAlert, renderReport, renderStatus } from '../src/render.js'
+import { renderAlert, renderDetail, renderReport, renderStatus, renderWaitingStatus } from '../src/render.js'
 import { judgeTurn } from '../src/verdict.js'
 import { PLAIN_THEME } from './helpers.js'
 
@@ -16,7 +16,6 @@ function verdict(overrides: Partial<TurnObservation> = {}): Verdict {
       servedModel: undefined,
       servedModelSource: undefined,
       fasterFallbackModel: undefined,
-      bufferingEnabled: undefined,
       sawRoutingHeaders: false,
       backendFamily: 'unknown',
       status: 200,
@@ -33,34 +32,24 @@ function status(overrides: Partial<TurnObservation> = {}): string {
   return renderStatus(verdict(overrides), PLAIN_THEME)
 }
 
+function detail(overrides: Partial<TurnObservation> = {}): string[] | undefined {
+  return renderDetail(verdict(overrides), PLAIN_THEME)
+}
+
 describe('renderStatus', () => {
-  it('shows the served model on a clean turn, so the check is visibly running', () => {
-    expect(status({ servedModel: 'gpt-6-astra', servedModelSource: 'header' })).toBe('✓ codex gpt-6-astra')
-  })
-
-  it('points the arrow down on a downgrade', () => {
-    expect(status({ servedModel: 'gpt-5.6-luna', servedModelSource: 'header' })).toBe(
-      '↓ codex gpt-6-astra→gpt-5.6-luna',
-    )
-  })
-
-  it('points the arrow up on an upgrade', () => {
+  // The footer line is shared with every other extension and hard-truncated, so this stays to a
+  // glyph and a label; the slugs live in the widget.
+  it('reduces each outcome to one glyph', () => {
+    expect(status({ servedModel: 'gpt-6-astra', servedModelSource: 'header' })).toBe('✓ codex')
+    expect(status({ servedModel: 'gpt-5.6-luna', servedModelSource: 'header' })).toBe('↓ codex')
     expect(status({ requestedModel: 'gpt-5.4', servedModel: 'gpt-6-astra', servedModelSource: 'header' })).toBe(
-      '↑ codex gpt-5.4→gpt-6-astra',
+      '↑ codex',
     )
+    expect(status({ servedModel: 'claude-opus-5', servedModelSource: 'header' })).toBe('⚠ codex')
+    expect(status()).toBe('? codex')
   })
 
-  it('uses an inequality sign when no rule orders the two', () => {
-    expect(status({ servedModel: 'claude-opus-5', servedModelSource: 'header' })).toBe(
-      '⚠ codex gpt-6-astra≠claude-opus-5',
-    )
-  })
-
-  it('says unverified rather than showing a clean turn', () => {
-    expect(status()).toBe('? codex gpt-6-astra unverified')
-  })
-
-  it('appends the effort pair when only effort diverged', () => {
+  it('marks a clean model with a diverged effort', () => {
     expect(
       status({
         servedModel: 'gpt-6-astra',
@@ -69,13 +58,69 @@ describe('renderStatus', () => {
         expectedEffort: 'xhigh',
         sentEffort: 'medium',
       }),
-    ).toBe('⚠ codex gpt-6-astra · xhigh→medium')
+    ).toBe('⚠ codex')
+  })
+})
+
+describe('renderWaitingStatus', () => {
+  it('distinguishes loaded-but-idle from not installed', () => {
+    expect(renderWaitingStatus(PLAIN_THEME)).toBe('· codex')
+  })
+})
+
+describe('renderDetail', () => {
+  it('stays away on a clean turn, so a clean session costs no rows', () => {
+    expect(detail({ servedModel: 'gpt-6-astra', servedModelSource: 'header' })).toBeUndefined()
+  })
+
+  it('stays away when nothing named a model, because the footer glyph already says so', () => {
+    expect(detail()).toBeUndefined()
+  })
+
+  it('says it in one row: both slugs and the signal that supplied the served one', () => {
+    expect(detail({ servedModel: 'gpt-5.6-luna', servedModelSource: 'header' })).toEqual([
+      '↓ codex gpt-6-astra→gpt-5.6-luna (openai-model header)',
+    ])
+  })
+
+  it('opens a row for an upgrade too', () => {
+    expect(detail({ requestedModel: 'gpt-5.4', servedModel: 'gpt-6-astra', servedModelSource: 'header' })).toEqual([
+      '↑ codex gpt-5.4→gpt-6-astra (openai-model header)',
+    ])
+  })
+
+  it('adds the effort pair, which an arrow between slugs cannot express', () => {
+    expect(
+      detail({
+        servedModel: 'gpt-6-astra',
+        servedModelSource: 'header',
+        selectedEffort: 'xhigh',
+        expectedEffort: 'xhigh',
+        sentEffort: 'medium',
+      }),
+    ).toEqual(['⚠ codex gpt-6-astra · xhigh→medium (openai-model header)'])
+  })
+
+  it('names an armed fallback, which the slugs alone would hide', () => {
+    expect(
+      detail({ servedModel: 'gpt-6-astra', servedModelSource: 'header', fasterFallbackModel: 'gpt-5.6-luna' }),
+    ).toEqual(['⚠ codex gpt-6-astra · fallback armed: gpt-5.6-luna (openai-model header)'])
+  })
+
+  it('never restates in prose what the slugs already said', () => {
+    const lines = detail({
+      requestedModel: 'gpt-5.9-quasar',
+      servedModel: 'gpt-5.8-quasar',
+      servedModelSource: 'header',
+    })
+
+    expect(lines).toEqual(['↓ codex gpt-5.9-quasar→gpt-5.8-quasar (openai-model header)'])
   })
 })
 
 describe('renderAlert', () => {
   it('leads with the finding that drove the verdict', () => {
-    expect(renderAlert(verdict({ servedModel: 'gpt-5.6-luna' }))).toContain("served 'gpt-5.6-luna'")
+    expect(renderAlert(verdict({ servedModel: 'gpt-5.6-luna' }))).toBe('codex-downgrade: gpt-6-astra→gpt-5.6-luna')
   })
 })
 

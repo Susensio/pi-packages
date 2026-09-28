@@ -1,7 +1,7 @@
 import type { ReportView } from '../src/render.js'
 import { describe, expect, it } from 'vitest'
 import { DEFAULT_CONFIG } from '../src/config.js'
-import { renderAlert, renderReport, renderStatus } from '../src/render.js'
+import { renderAlert, renderDetail, renderReport, renderStatus } from '../src/render.js'
 import { goodState, PLAIN_THEME } from './helpers.js'
 
 function report(overrides: Partial<ReportView> = {}): ReportView {
@@ -19,28 +19,35 @@ function report(overrides: Partial<ReportView> = {}): ReportView {
 }
 
 describe('renderStatus', () => {
-  it('shows how long the state has left', () => {
-    expect(renderStatus({ kind: 'good', remainingMs: 2_820_000 }, PLAIN_THEME)).toBe('✓ codex+ 292 · 47m left')
+  // The footer line is shared with every other extension and hard-truncated, so this stays to a
+  // glyph and a label; how long the state has left lives in `/codex-enhancer`.
+  it('reduces each kind to one glyph', () => {
+    expect(renderStatus({ kind: 'good' }, PLAIN_THEME)).toBe('✓ codex+')
+    expect(renderStatus({ kind: 'minting' }, PLAIN_THEME)).toBe('… codex+')
+    expect(renderStatus({ kind: 'missing' }, PLAIN_THEME)).toBe('? codex+')
+    expect(renderStatus({ kind: 'degraded' }, PLAIN_THEME)).toBe('⚠ codex+')
+    expect(renderStatus({ kind: 'unsupported' }, PLAIN_THEME)).toBe('· codex+')
+  })
+})
+
+describe('renderDetail', () => {
+  it('stays away while nothing has gone wrong yet', () => {
+    expect(renderDetail({ kind: 'missing' }, PLAIN_THEME)).toBeUndefined()
+    expect(renderDetail({ kind: 'good', detail: 'minted a 292-char state' }, PLAIN_THEME)).toBeUndefined()
+    expect(renderDetail({ kind: 'minting' }, PLAIN_THEME)).toBeUndefined()
+    expect(renderDetail({ kind: 'unsupported', detail: 'model is not gated' }, PLAIN_THEME)).toBeUndefined()
   })
 
-  it('rounds a nearly expired state down to under a minute', () => {
-    expect(renderStatus({ kind: 'good', remainingMs: 30_000 }, PLAIN_THEME)).toBe('✓ codex+ 292 · <1m left')
+  it('opens a row once a mint has actually failed', () => {
+    expect(renderDetail({ kind: 'missing', detail: 'socket hang up' }, PLAIN_THEME)).toEqual([
+      '? codex+ no state · socket hang up',
+    ])
   })
 
-  it('marks the footer while a probe is in flight', () => {
-    expect(renderStatus({ kind: 'minting' }, PLAIN_THEME)).toBe('… codex+ minting')
-  })
-
-  it('says the state is missing rather than implying the turn is fine', () => {
-    expect(renderStatus({ kind: 'missing' }, PLAIN_THEME)).toBe('? codex+ no state')
-  })
-
-  it('names a degraded state', () => {
-    expect(renderStatus({ kind: 'degraded' }, PLAIN_THEME)).toBe('⚠ codex+ degraded')
-  })
-
-  it('says a model the backend does not gate is not gated', () => {
-    expect(renderStatus({ kind: 'unsupported' }, PLAIN_THEME)).toBe('· codex+ not gated')
+  it('names what the degraded response carried', () => {
+    expect(renderDetail({ kind: 'degraded', detail: 'response carried 312 chars, not 292' }, PLAIN_THEME)).toEqual([
+      '⚠ codex+ degraded · response carried 312 chars, not 292',
+    ])
   })
 })
 

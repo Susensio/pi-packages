@@ -13,7 +13,6 @@ function turn(overrides: Partial<TurnObservation> = {}): TurnObservation {
     servedModel: undefined,
     servedModelSource: undefined,
     fasterFallbackModel: undefined,
-    bufferingEnabled: undefined,
     sawRoutingHeaders: false,
     backendFamily: 'unknown',
     status: 200,
@@ -32,6 +31,10 @@ function codes(verdict: Verdict): string[] {
   return verdict.findings.map(finding => finding.code)
 }
 
+function effortFinding(verdict: Verdict) {
+  return verdict.findings.find(finding => finding.code === 'EFFORT_SUBSTITUTED')
+}
+
 describe('judgeTurn model ladder', () => {
   it('reports silence as silence when nothing names a served model', () => {
     const verdict = judge()
@@ -39,11 +42,6 @@ describe('judgeTurn model ladder', () => {
     expect(verdict).toMatchObject({ outcome: 'unverified', level: 'warn' })
     expect(verdict.findings[0]?.code).toBe('UNVERIFIED')
     expect(isSubstitution(verdict)).toBe(false)
-  })
-
-  it('distinguishes headers that arrived but named nothing from no headers at all', () => {
-    expect(judge({ sawRoutingHeaders: true }).findings[0]?.message).toContain('carried routing headers')
-    expect(judge().findings[0]?.message).toContain('missing evidence')
   })
 
   it('passes an exact match', () => {
@@ -138,12 +136,8 @@ describe('judgeTurn supporting findings', () => {
     expect(isSubstitution(verdict)).toBe(false)
   })
 
-  it('still reports an armed fallback when the enabled header says false', () => {
-    const verdict = judge({
-      servedModel: 'gpt-6-astra',
-      fasterFallbackModel: 'gpt-5.6-luna',
-      bufferingEnabled: 'false',
-    })
+  it('reports an armed fallback that has not fired', () => {
+    const verdict = judge({ servedModel: 'gpt-6-astra', fasterFallbackModel: 'gpt-5.6-luna' })
 
     expect(codes(verdict)).toContain('SAFETY_BUFFERING_ARMED')
     expect(verdict.level).toBe('warn')
@@ -182,8 +176,12 @@ describe('judgeTurn effort axis', () => {
       sentEffort: 'medium',
     })
 
-    expect(verdict.effort).toMatchObject({ code: 'EFFORT_SUBSTITUTED', direction: 'lower', level: 'warn' })
-    expect(verdict.effort?.message).toContain('not what the server used')
+    expect(effortFinding(verdict)).toMatchObject({
+      code: 'EFFORT_SUBSTITUTED',
+      direction: 'lower',
+      level: 'warn',
+      note: 'xhigh→medium',
+    })
   })
 
   it('reports effort sent above it too', () => {
@@ -194,7 +192,7 @@ describe('judgeTurn effort axis', () => {
       sentEffort: 'high',
     })
 
-    expect(verdict.effort).toMatchObject({ direction: 'higher' })
+    expect(effortFinding(verdict)).toMatchObject({ direction: 'higher' })
   })
 
   it('stays quiet when the model itself maps the level to that effort', () => {
@@ -205,13 +203,13 @@ describe('judgeTurn effort axis', () => {
       sentEffort: 'high',
     })
 
-    expect(verdict.effort).toBeUndefined()
+    expect(effortFinding(verdict)).toBeUndefined()
     expect(verdict.level).toBe('ok')
   })
 
   it('stays quiet when either side is unknown', () => {
-    expect(judge({ servedModel: 'gpt-6-astra', sentEffort: 'high' }).effort).toBeUndefined()
-    expect(judge({ servedModel: 'gpt-6-astra', selectedEffort: 'high' }).effort).toBeUndefined()
+    expect(effortFinding(judge({ servedModel: 'gpt-6-astra', sentEffort: 'high' }))).toBeUndefined()
+    expect(effortFinding(judge({ servedModel: 'gpt-6-astra', selectedEffort: 'high' }))).toBeUndefined()
   })
 
   it('reports an unrankable effort pair as lateral rather than guessing', () => {
@@ -222,6 +220,6 @@ describe('judgeTurn effort axis', () => {
       sentEffort: 'turbo',
     })
 
-    expect(verdict.effort).toMatchObject({ direction: 'lateral' })
+    expect(effortFinding(verdict)).toMatchObject({ direction: 'lateral' })
   })
 })
