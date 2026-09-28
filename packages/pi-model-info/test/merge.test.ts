@@ -40,11 +40,13 @@ describe('unresolved models', () => {
 })
 
 describe('identity and carried fields', () => {
-  it('pins api and baseUrl and carries headers, compat and samplingParams', () => {
+  it('pins api and baseUrl and carries headers, compat, samplingParams, promptCache and inputLimits', () => {
     const snapshot = makeSnapshot({
       headers: { 'x-relay': '1' },
       samplingParams: { top_p: 0.9 },
       compat: { supportsStrictMode: true } as never,
+      promptCache: { short: 300 },
+      inputLimits: { images: { maxPerMessage: 4 } },
     })
     const { model } = mergeMetadata({
       snapshot,
@@ -57,6 +59,8 @@ describe('identity and carried fields', () => {
     expect(model.headers).toEqual({ 'x-relay': '1' })
     expect(model.samplingParams).toEqual({ top_p: 0.9 })
     expect(model.compat).toEqual({ supportsStrictMode: true })
+    expect(model.promptCache).toEqual({ short: 300 })
+    expect(model.inputLimits).toEqual({ images: { maxPerMessage: 4 } })
   })
 })
 

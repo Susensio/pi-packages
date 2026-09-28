@@ -11,7 +11,7 @@ describe('guardian policy', () => {
   it('records the pinned upstream revision and trusted Pi provenance boundary', () => {
     const prompt = buildSystemPrompt(config())
 
-    expect(POLICY_REVISION).toBe('openai-codex/a8c36ca6d265800c1b2c67d19d3583e23dee8382+pi1')
+    expect(POLICY_REVISION).toBe('openai-codex/26cb4d73e2ce25575644038d7af5beb2440d0ed0+pi2')
     expect(prompt).toContain('source field is "user" or "user_interaction"')
     expect(prompt).toContain('ask_user_question or plan_mode_question')
     expect(prompt).toContain('branch summary, compaction summary')
@@ -40,6 +40,14 @@ describe('guardian policy', () => {
     expect(prompt).toContain('conflicts resolve to the more restrictive outcome')
   })
 
+  it('places operator policy where upstream renders extra_policy, closing the security policy', () => {
+    const prompt = buildSystemPrompt(config({ additionalPolicy: 'Deny the abstract forbidden operation.' }))
+    const operatorPolicy = prompt.indexOf('## Operator Policy\nDeny the abstract forbidden operation.')
+
+    expect(operatorPolicy).toBeGreaterThan(prompt.indexOf('## Low-Risk Actions'))
+    expect(operatorPolicy).toBeLessThan(prompt.indexOf('# Outcome Policy'))
+  })
+
   it('keeps the fixed provenance and output protocol when operator policy replaces the baseline', () => {
     const prompt = buildSystemPrompt(
       config({
@@ -49,6 +57,7 @@ describe('guardian policy', () => {
     )
 
     expect(prompt).not.toContain('# Base Risk Taxonomy')
+    expect(prompt).not.toContain('# Outcome Policy')
     expect(prompt).toContain('Apply only the operator policy below')
     expect(prompt).toContain('Use the operator-defined classification.')
     expect(prompt).toContain('source field is "user" or "user_interaction"')

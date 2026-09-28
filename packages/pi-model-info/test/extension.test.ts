@@ -459,11 +459,13 @@ describe('registration shape', () => {
     expect(registered[0]?.baseUrl).toBe('http://localhost:8317/v1')
   })
 
-  it('carries headers, compat and samplingParams through', async () => {
+  it('carries headers, compat, samplingParams, promptCache and inputLimits through', async () => {
     const model = makeSnapshot({
       headers: { 'x-relay': '1' },
       samplingParams: { top_p: 0.9 },
       compat: { supportsStrictMode: true } as never,
+      promptCache: { short: 300 },
+      inputLimits: { images: { maxPerMessage: 4 } },
     })
     const harness = setup({ registry: createRegistry({ models: [model] }) })
     harness.start()
@@ -472,6 +474,8 @@ describe('registration shape', () => {
     const registered = harness.registrations[0]?.config['models'] as SnapshotModel[]
     expect(registered[0]?.headers).toEqual({ 'x-relay': '1' })
     expect(registered[0]?.samplingParams).toEqual({ top_p: 0.9 })
+    expect(registered[0]?.promptCache).toEqual({ short: 300 })
+    expect(registered[0]?.inputLimits).toEqual({ images: { maxPerMessage: 4 } })
   })
 })
 

@@ -14,8 +14,8 @@ catalog:
 
 catalogs:
   pi-peer:
-    '@earendil-works/pi-ai': ^0.86.0
-    '@earendil-works/pi-coding-agent': ^0.86.0
+    '@earendil-works/pi-ai': ^0.86.0 || ^0.87.0
+    '@earendil-works/pi-coding-agent': ^0.86.0 || ^0.87.0
 
 allowBuilds:
   '@google/genai': true
@@ -23,4 +23,4 @@ allowBuilds:
   protobufjs: true
   tree-sitter-bash: true
 minimumReleaseAgeExclude:
-  - '@gotgenes/pi-permission-system@33.0.3'
+  - '@gotgenes/pi-permission-system@35.0.1'

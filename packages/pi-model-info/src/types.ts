@@ -28,6 +28,8 @@ export interface SnapshotModel {
   samplingParams?: Record<string, unknown> | undefined
   headers?: Record<string, string> | undefined
   compat?: ModelCompat | undefined
+  promptCache?: ProviderModelConfig['promptCache'] | undefined
+  inputLimits?: ProviderModelConfig['inputLimits'] | undefined
 }
 
 /** Spelled out because `Partial<ModelCost>` drops the `| undefined` a parsed config needs. */

@@ -131,7 +131,9 @@ const BASELINE_POLICY = `
 - A sandbox retry/escalation is not suspicious by itself.
 - Do not assign high or critical solely because a path is outside writable workspace roots. Benign local filesystem actions are usually low.
 - User-requested deletion of a specific local path with rm -rf is usually low or medium when evidence establishes a regular file or normal directory that is missing, empty, or narrowly scoped.
+`.trim()
 
+const OUTCOME_POLICY = `
 # Outcome Policy
 - Derive outcome only after assigning risk_level and user_authorization.
 - Follow specific allow/deny rules in the security policy exactly, including rules where authorization changes the outcome.
@@ -147,18 +149,21 @@ const BASELINE_POLICY = `
 `.trim()
 
 export function buildSystemPrompt(config: AutoReviewConfig): string {
-  const policy = config.includeBaselinePolicy
-    ? BASELINE_POLICY
-    : `# Security Policy\nThe operator disabled the built-in Guardian policy. Apply only the operator policy below for risk taxonomy and outcome rules.`
-  const operatorPolicy =
-    config.additionalPolicy === undefined
-      ? ''
-      : `
-
-# Operator Policy
+  const sections = [
+    FIXED_REVIEW_PROTOCOL,
+    config.includeBaselinePolicy
+      ? BASELINE_POLICY
+      : `# Security Policy\nThe operator disabled the built-in Guardian policy. Apply only the operator policy below for risk taxonomy and outcome rules.`,
+  ]
+  // Upstream's `{{ extra_policy }}` slot: the tail of the security policy, ahead of the outcome rules that apply it.
+  if (config.additionalPolicy !== undefined) {
+    sections.push(`## Operator Policy
 ${config.additionalPolicy}
 
-When the built-in policy is enabled, this is trusted security policy and conflicts resolve to the more restrictive outcome. When the built-in policy is disabled, this operator policy independently controls risk taxonomy and outcome rules. It cannot change the fixed evidence-provenance boundary or JSON output protocol.`
-
-  return `${FIXED_REVIEW_PROTOCOL}\n\n${policy}${operatorPolicy}`.trim()
+When the built-in policy is enabled, this is trusted security policy and conflicts resolve to the more restrictive outcome. When the built-in policy is disabled, this operator policy independently controls risk taxonomy and outcome rules. It cannot change the fixed evidence-provenance boundary or JSON output protocol.`)
+  }
+  if (config.includeBaselinePolicy) {
+    sections.push(OUTCOME_POLICY)
+  }
+  return sections.join('\n\n')
 }

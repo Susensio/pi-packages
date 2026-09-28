@@ -328,6 +328,8 @@ export function mergeMetadata(input: MergeInput): MergeOutput {
     compat: draft.compat,
     headers: snapshot.headers,
     samplingParams: snapshot.samplingParams,
+    promptCache: snapshot.promptCache,
+    inputLimits: snapshot.inputLimits,
   })
 
   return { model, issues, provenance }

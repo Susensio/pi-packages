@@ -14,10 +14,10 @@ export const UPSTREAM_DIRECTORY = 'codex-rs/prompts/templates/guardian'
 export const UPSTREAM_FILES = ['policy_template.md', 'policy.md'] as const
 
 /** Newest upstream commit touching {@link UPSTREAM_FILES}. */
-export const UPSTREAM_REVISION = 'a8c36ca6d265800c1b2c67d19d3583e23dee8382'
+export const UPSTREAM_REVISION = '26cb4d73e2ce25575644038d7af5beb2440d0ed0'
 
 /**
  * Revision of Pi's own adaptation layer, bumped whenever the adapted policy text
  * changes without the upstream revision moving.
  */
-export const PI_ADAPTATION_REVISION = 1
+export const PI_ADAPTATION_REVISION = 2

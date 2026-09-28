@@ -292,7 +292,7 @@ describe('permission reviewer', () => {
       reasoning: 'low',
     })
     expect(log.review.mock.calls[0]?.[1]).toMatchObject({
-      policyRevision: 'openai-codex/a8c36ca6d265800c1b2c67d19d3583e23dee8382+pi1',
+      policyRevision: 'openai-codex/26cb4d73e2ce25575644038d7af5beb2440d0ed0+pi2',
       contextSource: 'active-branch',
       transcriptEntriesRetained: 1,
       transcriptEntriesOmitted: 0,
